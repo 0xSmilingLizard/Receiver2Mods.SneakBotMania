@@ -1,6 +1,6 @@
 # SneakBotMania
  
-A mod for Receiver 2, that adds a timer to spwan stalker entities and related settings.
+A mod for Receiver 2, that adds a timer to spawn stalker entities and related settings.
 
 ## Install
 
