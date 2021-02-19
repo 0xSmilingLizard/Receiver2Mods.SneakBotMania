@@ -1,6 +1,6 @@
 # SneakBotMania
  
-A mod for `Receiver 2`, that adds a timer to spwan stalker entities and related settings.
+A mod for Receiver 2, that adds a timer to spwan stalker entities and related settings.
 
 ## Install
 
@@ -11,4 +11,4 @@ It is recommended to use [BepInEx's Config Manager](https://github.com/BepInEx/B
 
 ## Dependencies
 
-The source code depends on `0Harmony.dll`, `BepInEx.dll`, `UnityEngine.dll`, `UnityEngine.CoreModule.dll`, and `Wolfire.Receiver2.dll`. It is set up to expect these DLLs to be located in a folder called `libraries` next to the repository folder.
+The source code depends on `0Harmony.dll`, `BepInEx.dll`, `UnityEngine.dll`, `UnityEngine.CoreModule.dll`, and `Wolfire.Receiver2.dll`. It is set up to expect these DLLs to be located in a folder called `libraries` next to the repository folder. All of these DLLs can be found as part of either Receiver 2's or BepInEx's install.
