@@ -6,101 +6,127 @@ using BepInEx.Configuration;
 using HarmonyLib;
 
 using Receiver2;
+using Receiver2.SneakBot;
 
 using UnityEngine;
 
 namespace SneakBotMania
 {
     [BepInProcess("Receiver2.exe")]
-    [BepInPlugin("SmilingLizard.plugins.sneakbotmania", "SneakBot Mania", "2.0")]
+    [BepInPlugin("SmilingLizard.plugins.sneakbotmania", "SneakBot Mania", "2.1")]
     public class SneakBotMania : BaseUnityPlugin
     {
-        private ConfigEntry<KeyboardShortcut> _manualSpawnCfg;
-        private ConfigEntry<int> _minimumSpawnCfg;
-        private ConfigEntry<int> _maximumSpawnCfg;
-        private ConfigEntry<float> _initialTimerCfg;
-        private ConfigEntry<float> _minTimerCfg;
-        private ConfigEntry<float> _maxTimerCfg;
-        private ConfigEntry<bool> _enableTimeCfg;
-        private System.Random _rng;
+        private ConfigEntry<KeyboardShortcut> manualSpawnCfg;
+        private ConfigEntry<int> minimumSpawnCfg;
+        private ConfigEntry<int> maximumSpawnCfg;
+        private ConfigEntry<float> initialTimerCfg;
+        private ConfigEntry<float> minTimerCfg;
+        private ConfigEntry<float> maxTimerCfg;
+        private ConfigEntry<bool> enableTimeCfg;
+        private ConfigEntry<bool> unlimitVanilla;
+        private ConfigEntry<bool> alternateGong;
 
-        private static SneakBotMania _Instance { get; set; }
+        private System.Random rng;
 
-        private float _timer = -1f;
+        private static SneakBotMania Instance { get; set; }
 
-        int _MinAmount => this._minimumSpawnCfg.Value;
-        private int _MaxAmount => this._maximumSpawnCfg.Value;
-        bool _RandomAmount => this._maximumSpawnCfg.Value > this._MinAmount;
+        private float timer = -1f;
 
-        private int _SpawnAmount => this._RandomAmount ? _GetRandomizedAmount() : this._MinAmount;
+        private int MinAmount => this.minimumSpawnCfg.Value;
+        private int MaxAmount => this.maximumSpawnCfg.Value;
+        private bool RandomAmount => this.maximumSpawnCfg.Value > this.MinAmount;
 
-        float _MinTimer => this._minTimerCfg.Value;
-        private float _Maxtimer => this._maxTimerCfg.Value;
-        private bool _TimerEnabled => this._enableTimeCfg.Value && this._maxTimerCfg.Value > 0;
-        private bool _TimerRandom => 0f < this._MinTimer && this._MinTimer < this._maxTimerCfg.Value;
+        private int SpawnAmount => this.RandomAmount ? GetRandomizedAmount() : this.MinAmount;
+
+        private float MinTimer => this.minTimerCfg.Value;
+        private float Maxtimer => this.maxTimerCfg.Value;
+        private bool TimerEnabled => this.enableTimeCfg.Value && this.maxTimerCfg.Value > 0;
+        private bool TimerRandom => 0f < this.MinTimer && this.MinTimer < this.maxTimerCfg.Value;
 
         public void Awake()
         {
-            _Instance = this;
-            this._manualSpawnCfg = this.Config.Bind(section: "Keybind",
-                                                    key: "Manual Spawn",
-                                                    defaultValue: new KeyboardShortcut(KeyCode.None),
-                                                    description: "Spawns SneakBots; amount determined same as normal; circumvents any spawn limits.");
-            this._minimumSpawnCfg = this.Config.Bind(section: "Spawn Amount",
-                                                     key: "Minimum",
-                                                     defaultValue: 1,
-                                                     configDescription: new ConfigDescription("The minimum amount of SneakBots to spawn whenever any are spawned.",
-                                                                                              new AcceptableValueRange<int>(1, 50)));
-            this._maximumSpawnCfg = this.Config.Bind(section: "Spawn Amount",
-                                                     key: "Maximum",
-                                                     defaultValue: 1,
-                                                     configDescription: new ConfigDescription("The maximum amount of SneakBots to spawn whenever any are spawned. If this is equal or smaller than the minimum amount, then the amount spawned isn't random but equal the minimum value instead.",
-                                                                                              new AcceptableValueRange<int>(1, 50)));
-            this._initialTimerCfg = this.Config.Bind(section: "Timer",
-                                                          key: "Timer Initial Duration",
-                                                          defaultValue: 0f,
-                                                          configDescription: new ConfigDescription("The length of the timer is randomly set whenever it elapses. This is the duration it starts with. Set to zero to determine inital duration by normal rules.",
-                                                                                          new AcceptableValueRange<float>(0f, 600f)));
-            this._minTimerCfg = this.Config.Bind(section: "Timer",
-                                                 key: "Timer Minimum Duration",
-                                                 defaultValue: 0f,
-                                                 configDescription: new ConfigDescription("This is the minimum duration it can be set to. Set to zero or a value grater than the maximum to make the timer not random.",
-                                                                                          new AcceptableValueRange<float>(0f, 600f)));
-            this._maxTimerCfg = this.Config.Bind(section: "Timer",
-                                                 key: "Timer Maximum Duration",
-                                                 defaultValue: 0f,
-                                                 configDescription: new ConfigDescription("This is the maximum duration it can be set to. Set to zero to disable the timer.",
-                                                                                          new AcceptableValueRange<float>(0f, 600f)));
-            this._enableTimeCfg = this.Config.Bind("Timer",
-                                           "Enable Timer",
-                                           false,
-                                           "Enables the timer. Use this to disable it so that you can change its durations without immediately spawning a SneakBot.");
+            Instance = this;
+            this.manualSpawnCfg = this.Config.Bind(
+                section: "Keybind",
+                key: "Manual Spawn",
+                defaultValue: new KeyboardShortcut(KeyCode.None),
+                description: "Spawns SneakBots; amount determined same as normal; circumvents any spawn limits.");
+            this.minimumSpawnCfg = this.Config.Bind(
+                section: "Spawn Amount",
+                key: "Minimum",
+                defaultValue: 1,
+                configDescription: new ConfigDescription(
+                    "The minimum amount of SneakBots to spawn whenever any are spawned.",
+                    new AcceptableValueRange<int>(1, 50)));
+            this.maximumSpawnCfg = this.Config.Bind(
+                section: "Spawn Amount",
+                key: "Maximum",
+                defaultValue: 1,
+                configDescription: new ConfigDescription(
+                    "The maximum amount of SneakBots to spawn whenever any are spawned. If this is equal or smaller than the minimum amount, then the amount spawned isn't random but equal the minimum value instead.",
+                    new AcceptableValueRange<int>(1, 50)));
+            this.initialTimerCfg = this.Config.Bind(
+                section: "Timer",
+                key: "Timer Initial Duration",
+                defaultValue: 0f,
+                configDescription: new ConfigDescription(
+                    "The length of the timer is randomly set whenever it elapses. This is the duration it starts with. Set to zero to determine inital duration by normal rules.",
+                    new AcceptableValueRange<float>(0f, 600f)));
+            this.minTimerCfg = this.Config.Bind(
+                section: "Timer",
+                key: "Timer Minimum Duration",
+                defaultValue: 0f,
+                configDescription: new ConfigDescription(
+                    "This is the minimum duration it can be set to. Set to zero or a value grater than the maximum to make the timer not random.",
+                    new AcceptableValueRange<float>(0f, 600f)));
+            this.maxTimerCfg = this.Config.Bind(
+                section: "Timer",
+                key: "Timer Maximum Duration",
+                defaultValue: 0f,
+                configDescription: new ConfigDescription(
+                    "This is the maximum duration it can be set to. Set to zero to disable the timer.",
+                    new AcceptableValueRange<float>(0f, 600f)));
+            this.enableTimeCfg = this.Config.Bind(
+                "Timer",
+                "Enable Timer",
+                false,
+                "Enables the timer. Use this to disable it so that you can change its durations without immediately spawning a SneakBot.");
+            this.unlimitVanilla = this.Config.Bind(
+                section: "Overwrite",
+                key: "Natural Limit",
+                defaultValue: false,
+                description: "Removes the limit of 1 per level from normal means of spawning sneakbots. (\"Alternate Gong Mechanic\" recommended)");
+            this.alternateGong = this.Config.Bind(
+                section: "Overwrite",
+                key: "Alternate Gong Mechanic",
+                defaultValue: false,
+                description: "Changes the way the gong decides to spawn sneakbots to be more compatible with \"Natural Limit\".");
 
-            this._timer = this._initialTimerCfg.Value > 0 ? this._initialTimerCfg.Value : _GetNextTimerDuration();
+            this.timer = this.initialTimerCfg.Value > 0 ? this.initialTimerCfg.Value : GetNextTimerDuration();
 
-            this._rng = new System.Random();
+            this.rng = new System.Random();
             _ = Harmony.CreateAndPatchAll(typeof(SneakBotMania));
         }
 
         public void Update()
         {
-            if (this._TimerEnabled)
+            if (this.TimerEnabled)
             {
                 if (RuntimeTileLevelGenerator.instance is null)
                 {
-                    this._timer = this._initialTimerCfg.Value;
+                    this.timer = this.initialTimerCfg.Value;
                 }
                 else
                 {
-                    this._timer -= Time.deltaTime;
-                    if (this._timer <= 0f)
+                    this.timer -= Time.deltaTime;
+                    if (this.timer <= 0f)
                     {
-                        this._timer = _GetNextTimerDuration();
+                        this.timer = GetNextTimerDuration();
                         _ = RuntimeTileLevelGenerator.instance.CreateSneakBot();
                     }
                 }
             }
-            if (this._manualSpawnCfg.Value.IsDown())
+            if (this.manualSpawnCfg.Value.IsDown())
             {
                 if (RuntimeTileLevelGenerator.instance is null)
                 {
@@ -112,14 +138,14 @@ namespace SneakBotMania
             }
         }
 
-        private float _GetNextTimerDuration()
+        private float GetNextTimerDuration()
         {
-            return this._TimerRandom ? (float)this._rng.NextDouble() * this._Maxtimer + this._MinTimer : this._MinTimer;
+            return this.TimerRandom ? (float)this.rng.NextDouble() * this.Maxtimer + this.MinTimer : this.MinTimer;
         }
 
-        private int _GetRandomizedAmount()
+        private int GetRandomizedAmount()
         {
-            return this._RandomAmount ? this._rng.Next(this._MinAmount, this._MaxAmount + 1) : this._MinAmount;
+            return this.RandomAmount ? this.rng.Next(this.MinAmount, this.MaxAmount + 1) : this.MinAmount;
         }
 
         public void SneakBotLoop()
@@ -130,7 +156,7 @@ namespace SneakBotMania
                 return;
             }
 
-            int toBeSpawned = this._SpawnAmount;
+            int toBeSpawned = this.SpawnAmount;
             this.Logger.LogInfo($"Spawning {toBeSpawned} SneakBots. Enjoy!");
 
             for (int i = 0; i < toBeSpawned - 1; i++)
@@ -144,7 +170,7 @@ namespace SneakBotMania
         [HarmonyAfter(nameof(OriginalSneakBot))]
         public static void SneakBotPatch()
         {
-            _Instance.SneakBotLoop();
+            Instance.SneakBotLoop();
         }
 
         [HarmonyReversePatch]
@@ -152,6 +178,68 @@ namespace SneakBotMania
         public static ActiveEnemy OriginalSneakBot(RuntimeTileLevelGenerator instance)
         {
             throw new NotImplementedException("This method failed to be replaced with CreateSneakBot().");
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(SneakBotSpawner), nameof(SneakBotSpawner.TrySpawnSneakBot))]
+        public static bool UnlimitSpawner()
+        {
+            if (Instance.unlimitVanilla.Value)
+            {
+                RuntimeTileLevelGenerator rt = RuntimeTileLevelGenerator.instance;
+
+                if (rt != null)
+                {
+                    RankingProgressionGameMode mode = ReceiverCoreScript.Instance() is null
+                        ? null
+                        : ReceiverCoreScript.Instance().game_mode as RankingProgressionGameMode;
+
+                    if (mode != null
+                        && !mode.progression_data.has_picked_up_sneakbot_tape
+                        && !mode.progression_data.has_picked_up_mindcontrol_tape)
+                    {
+                        RankingProgressionGameMode.can_unlock_sneak_bot_note = true;
+                    }
+
+                    ReceiverOnScreenMessage.QueueMessage(Locale.GetUIString(LocaleUIString.SB_SPAWN_MESSAGE));
+                    _ = rt.CreateSneakBot();
+
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static int count = 10;
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(CountTrigger), nameof(CountTrigger.Increment))]
+        public static bool StaticCount(CountTrigger __instance)
+        {
+            if (Instance.alternateGong.Value)
+            {
+                if (__instance.gameObject.GetComponent<SneakBotSpawner>() is SneakBotSpawner sbs)
+                {
+                    if (--count <= 0)
+                    {
+                        count = Instance.rng.Next(1, 12);
+
+                        if (Instance.rng.Next(100) is 0)
+                        {
+                            sbs.TrySpawnSneakBotInstanced();
+                            sbs.TrySpawnSneakBotInstanced();
+                            sbs.TrySpawnSneakBotInstanced();
+                        }
+                        else
+                        {
+                            sbs.TrySpawnSneakBotInstanced();
+                        }
+                    }
+
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }
